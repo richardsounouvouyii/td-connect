@@ -1,0 +1,142 @@
+@import 'tailwindcss';
+@plugin "daisyui" {
+  themes: tdconnect --default;
+}
+
+@plugin "daisyui/theme" {
+  name: 'tdconnect';
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: #f5f7fb;
+  --color-base-200: #e8eef6;
+  --color-base-300: #cfd9e6;
+  --color-base-content: #102a43;
+
+  --color-primary: #0b3d91;
+  --color-primary-content: #ffffff;
+  --color-secondary: #1b3358;
+  --color-secondary-content: #ffffff;
+  --color-accent: #2b6cb0;
+  --color-accent-content: #ffffff;
+
+  --color-neutral: #334e68;
+  --color-neutral-content: #f0f4f8;
+  --color-info: #2b6cb0;
+  --color-info-content: #ffffff;
+  --color-success: #2f855a;
+  --color-success-content: #ffffff;
+  --color-warning: #b7791f;
+  --color-warning-content: #ffffff;
+  --color-error: #c53030;
+  --color-error-content: #ffffff;
+}
+
+@theme {
+  --font-sans: 'Figtree', 'Segoe UI', sans-serif;
+  --font-display: 'Literata', 'Georgia', serif;
+  --color-td-navy: #0b3d91;
+  --color-td-ink: #102a43;
+  --color-td-mist: #f5f7fb;
+  --color-td-line: #cfd9e6;
+
+  --animate-fade-up: fade-up 0.7s ease-out both;
+  --animate-fade-in: fade-in 0.8s ease-out both;
+  --animate-soft-float: soft-float 6s ease-in-out infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes soft-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes field-fill {
+  0% {
+    box-shadow: 0 0 0 0 rgb(43 108 176 / 0.35);
+    background-color: rgb(43 108 176 / 0.08);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    background-color: transparent;
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-dvh bg-base-100 font-sans text-base font-normal text-base-content antialiased;
+  }
+
+  /* Texte courant un peu plus lisible que le gras seul. */
+  p,
+  li,
+  label,
+  .field-label {
+    color: color-mix(in oklab, var(--color-base-content) 92%, transparent);
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+}
+
+@layer components {
+  /* Champs visibles sur toutes les pages (bordure DaisyUI trop pâle). */
+  .field-control {
+    @apply w-full min-h-11 rounded-lg border-2 border-base-300 bg-white px-3 text-base text-base-content outline-none transition;
+  }
+
+  .field-control:focus {
+    @apply border-primary ring-2 ring-primary/15;
+  }
+
+  .field-control-error {
+    @apply border-error;
+  }
+
+  .field-label {
+    @apply mb-1 block text-sm font-medium text-base-content;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .hero-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+}
