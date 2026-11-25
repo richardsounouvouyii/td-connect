@@ -1,0 +1,7 @@
+{
+  "installCommand": "npm install --prefix td-frontend",
+  "buildCommand": "npm run build --prefix td-frontend",
+  "outputDirectory": "td-frontend/dist",
+  "framework": "vite",
+  "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/index.html" }]
+}
