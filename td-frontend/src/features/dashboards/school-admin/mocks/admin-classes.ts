@@ -3,7 +3,6 @@ import {
   type AdminPlanningRow,
 } from '@/features/dashboards/school-admin/lib/admin-planning-rows'
 import { ADMIN_TRAINERS } from '@/features/dashboards/school-admin/mocks/admin-catalog'
-import { listAdminSessions } from '@/features/dashboards/school-admin/mocks/admin-sessions'
 import type {
   AdminClass,
   AdminClassLevel,
@@ -110,20 +109,39 @@ export function listTrainersForClass(classItem: AdminClass): AdminTrainerOption[
     .filter((trainer): trainer is AdminTrainerOption => Boolean(trainer))
 }
 
-/** Séances du planning liées à cette classe. */
+/** Groupes TD pour une classe + matière. */
+export function listGroupsForClassAndSubject(
+  classLabel: string,
+  subject: string,
+): string[] {
+  const classItem = getAdminClassByLabel(classLabel)
+  if (!classItem) return []
+  return classItem.groups
+    .filter((group) => group.subject === subject)
+    .map((group) => group.label)
+}
+
+/** Séances du planning liées à cette classe (offres publiques = 1 ligne). */
 export function countSessionsForClass(classLabel: string): {
   total: number
   pending: number
   published: number
 } {
-  const sessions = listAdminSessions().filter(
-    (session) => session.classLabel === classLabel,
-  )
+  const rows = listAdminPlanningRows('ALL').filter((row) => {
+    const session =
+      row.kind === 'session' ? row.session : row.representative
+    return session.classLabel === classLabel
+  })
   return {
-    total: sessions.length,
-    pending: sessions.filter((session) => session.status === 'PENDING').length,
-    published: sessions.filter((session) => session.status === 'PUBLISHED')
-      .length,
+    total: rows.length,
+    pending: rows.filter((row) => {
+      const status = row.kind === 'session' ? row.session.status : row.status
+      return status === 'PENDING'
+    }).length,
+    published: rows.filter((row) => {
+      const status = row.kind === 'session' ? row.session.status : row.status
+      return status === 'PUBLISHED'
+    }).length,
   }
 }
 

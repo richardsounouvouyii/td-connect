@@ -1,10 +1,12 @@
 import { getAdminTrainerById } from '@/features/dashboards/school-admin/mocks/admin-catalog'
 import { DEMO_PUBLIC_OFFER_SESSIONS } from '@/features/dashboards/school-admin/mocks/admin-demo-public-offers'
+import { loadAdminSettings } from '@/features/dashboards/school-admin/mocks/admin-settings'
 import type {
   AdminProposePublicSessionInput,
   AdminProposeSessionInput,
   AdminSession,
 } from '@/features/dashboards/school-admin/types'
+import { pushStudentNotification } from '@/features/dashboards/student/lib/student-notifications-store'
 import { pushTrainerNotification } from '@/features/dashboards/trainer/lib/trainer-notifications-store'
 import type { TrainerAdminPack } from '@/features/dashboards/trainer/types'
 
@@ -123,10 +125,7 @@ export function getAdminSessionPack(
   return packs[sessionId]
 }
 
-export function saveAdminSessionPack(
-  sessionId: string,
-  pack: TrainerAdminPack,
-) {
+function writePackForSession(sessionId: string, pack: TrainerAdminPack) {
   const packs = readJson<Record<string, TrainerAdminPack>>(PACKS_KEY, {})
   packs[sessionId] = pack
   writeJson(PACKS_KEY, packs)
@@ -138,6 +137,69 @@ export function saveAdminSessionPack(
     hasAdminCorrection: Boolean(pack.correction),
   }
   writeJson(OVERRIDES_KEY, overrides)
+}
+
+export function saveAdminSessionPack(
+  sessionId: string,
+  pack: TrainerAdminPack,
+) {
+  const targetIds = new Set<string>([sessionId])
+  const group = findOfferGroupBySessionId(sessionId)
+  if (group) {
+    for (const siblingId of group.sessionIds) targetIds.add(siblingId)
+  }
+
+  for (const id of targetIds) {
+    writePackForSession(id, pack)
+  }
+
+  notifyTrainerPackIfEnabled(sessionId, pack)
+}
+
+function notifyTrainerPackIfEnabled(
+  sessionId: string,
+  pack: TrainerAdminPack,
+) {
+  if (!pack.exam && !pack.correction) return
+  if (!loadAdminSettings().notifyTrainerOnPack) return
+
+  const known = [...DEMO_PUBLIC_OFFER_SESSIONS, ...getAdminExtraSessions()].map(
+    mergeAdminSessionOverrides,
+  )
+  const session = known.find((item) => item.id === sessionId)
+  if (!session) return
+
+  const group = findOfferGroupBySessionId(sessionId)
+  const trainerIds = group
+    ? [
+        ...new Set(
+          known
+            .filter((item) => group.sessionIds.includes(item.id))
+            .map((item) => item.trainerId),
+        ),
+      ]
+    : [session.trainerId]
+
+  for (const trainerId of trainerIds) {
+    pushTrainerNotification({
+      trainerId,
+      title: 'Pack admin joint',
+      message: `Épreuve / corrigé disponibles pour « ${session.chapter} ».`,
+      kind: 'ADMIN_PACK_READY',
+      linkedSessionId: sessionId,
+      linkedToDocuments: true,
+    })
+  }
+}
+
+function notifyStudentsPublishedIfEnabled(session: AdminSession) {
+  if (!loadAdminSettings().notifyStudentsOnPublish) return
+  pushStudentNotification({
+    title: 'Nouvelle séance publiée',
+    message: `${session.subject} — ${session.chapter} le ${session.date} (${session.startTime}–${session.endTime}).`,
+    kind: 'SESSION_PUBLISHED',
+    linkedSessionId: session.id,
+  })
 }
 
 function buildAdminSession(
@@ -190,13 +252,22 @@ export function proposeAdminSession(
   input: AdminProposeSessionInput,
 ): AdminSession {
   const session = buildAdminSession(input, `admin-new-${Date.now()}`)
+  const autoPublish = !loadAdminSettings().requireTrainerValidation
+  if (autoPublish) {
+    session.status = 'PUBLISHED'
+  }
   saveExtraSession(session)
 
   if (input.adminPack && (input.adminPack.exam || input.adminPack.correction)) {
-    saveAdminSessionPack(session.id, input.adminPack)
+    writePackForSession(session.id, input.adminPack)
+    notifyTrainerPackIfEnabled(session.id, input.adminPack)
   }
 
-  notifyTrainerOfProposal(session, Boolean(input.isPublicOffer))
+  if (autoPublish) {
+    notifyStudentsPublishedIfEnabled(session)
+  } else {
+    notifyTrainerOfProposal(session, Boolean(input.isPublicOffer))
+  }
   return session
 }
 
@@ -228,7 +299,7 @@ export function proposePublicAdminSessions(
     )
     saveExtraSession(session)
     if (input.adminPack && (input.adminPack.exam || input.adminPack.correction)) {
-      saveAdminSessionPack(session.id, input.adminPack)
+      writePackForSession(session.id, input.adminPack)
     }
     notifyTrainerOfProposal(session, true)
     return session
@@ -240,6 +311,14 @@ export function proposePublicAdminSessions(
     sessionIds: sessions.map((session) => session.id),
   }
   writeOfferGroups(groups)
+
+  if (
+    input.adminPack &&
+    (input.adminPack.exam || input.adminPack.correction) &&
+    sessions[0]
+  ) {
+    notifyTrainerPackIfEnabled(sessions[0].id, input.adminPack)
+  }
 
   return sessions
 }
@@ -256,6 +335,15 @@ export function patchAdminSessionStatus(
     ...(statusNote !== undefined ? { statusNote } : {}),
   }
   writeJson(OVERRIDES_KEY, overrides)
+
+  if (status === 'PUBLISHED') {
+    const known = [
+      ...DEMO_PUBLIC_OFFER_SESSIONS,
+      ...getAdminExtraSessions(),
+    ].map(mergeAdminSessionOverrides)
+    const session = known.find((item) => item.id === sessionId)
+    if (session) notifyStudentsPublishedIfEnabled(session)
+  }
 }
 
 /**
@@ -296,22 +384,30 @@ export function claimPublicOfferSession(
   return { ok: true }
 }
 
-export function postponeAdminSession(sessionId: string, note: string) {
-  const overrides = readJson<Record<string, SessionOverride>>(OVERRIDES_KEY, {})
-  overrides[sessionId] = {
-    ...overrides[sessionId],
-    status: 'POSTPONED',
-    statusNote: note || 'Report demandé par l’établissement.',
+function patchStatusForOfferOrSession(
+  sessionId: string,
+  status: Extract<AdminSession['status'], 'POSTPONED' | 'CANCELLED'>,
+  statusNote: string,
+) {
+  const group = findOfferGroupBySessionId(sessionId)
+  const ids = group?.sessionIds ?? [sessionId]
+  for (const id of ids) {
+    patchAdminSessionStatus(id, status, statusNote)
   }
-  writeJson(OVERRIDES_KEY, overrides)
+}
+
+export function postponeAdminSession(sessionId: string, note: string) {
+  patchStatusForOfferOrSession(
+    sessionId,
+    'POSTPONED',
+    note || 'Report demandé par l’établissement.',
+  )
 }
 
 export function cancelAdminSession(sessionId: string, note: string) {
-  const overrides = readJson<Record<string, SessionOverride>>(OVERRIDES_KEY, {})
-  overrides[sessionId] = {
-    ...overrides[sessionId],
-    status: 'CANCELLED',
-    statusNote: note || 'Annulée par l’établissement.',
-  }
-  writeJson(OVERRIDES_KEY, overrides)
+  patchStatusForOfferOrSession(
+    sessionId,
+    'CANCELLED',
+    note || 'Annulée par l’établissement.',
+  )
 }

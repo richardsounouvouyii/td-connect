@@ -26,10 +26,12 @@ import { AdminSessionStatusBadge } from '@/features/dashboards/school-admin/comp
 import { OfferKindBadge } from '@/features/dashboards/school-admin/components/OfferKindBadge'
 import {
   cancelAdminSession,
+  findOfferGroupBySessionId,
   getAdminSessionPack,
   postponeAdminSession,
   saveAdminSessionPack,
 } from '@/features/dashboards/school-admin/lib/admin-sessions-store'
+import { listAdminSessions } from '@/features/dashboards/school-admin/mocks/admin-sessions'
 import {
   adminPricingLabel,
   formatAdminSessionPrice,
@@ -59,6 +61,16 @@ export function SchoolAdminSessionDetailPage() {
     () => (sessionId ? getAdminSessionById(sessionId) : undefined),
     [sessionId, version],
   )
+
+  const offerSiblings = useMemo(() => {
+    void version
+    if (!sessionId) return []
+    const group = findOfferGroupBySessionId(sessionId)
+    if (!group) return []
+    return listAdminSessions().filter((item) =>
+      group.sessionIds.includes(item.id),
+    )
+  }, [sessionId, version])
 
   if (!session) {
     return <Navigate to="/admin-etablissement/planning" replace />
@@ -169,6 +181,25 @@ export function SchoolAdminSessionDetailPage() {
         ) : null}
       </header>
 
+      {offerSiblings.length > 1 ? (
+        <section className="rounded-xl border border-base-300 bg-white p-4 font-sans sm:p-5">
+          <h2 className="font-display text-xl font-semibold tracking-tight">
+            Formateurs de l’offre
+          </h2>
+          <ul className="mt-3 flex flex-col gap-2">
+            {offerSiblings.map((sibling) => (
+              <li
+                key={sibling.id}
+                className="flex flex-wrap items-center justify-between gap-2 border border-base-200 px-3 py-2.5"
+              >
+                <span className="text-sm font-medium">{sibling.trainerName}</span>
+                <AdminSessionStatusBadge status={sibling.status} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <section className="rounded-xl border border-base-300 bg-white p-4 font-sans sm:p-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">
           Détails
@@ -201,6 +232,12 @@ export function SchoolAdminSessionDetailPage() {
             value={`${session.seatsTaken} / ${session.seatsTotal}`}
           />
         </dl>
+        {session.proposalNote ? (
+          <p className="mt-4 rounded-lg border border-base-200 bg-base-200/30 px-3 py-2 text-sm">
+            <span className="font-medium">Note : </span>
+            {session.proposalNote}
+          </p>
+        ) : null}
 
         <div className="mt-5 flex items-center justify-between gap-3 rounded-lg border border-success/25 bg-success/5 px-3 py-2.5">
           <div className="flex items-center gap-2 text-sm text-base-content/90">

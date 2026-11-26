@@ -48,6 +48,15 @@ function pickOfferStatus(sessions: AdminSession[]): {
     return { status: 'POSTPONED', representative: postponed }
   }
 
+  const rejected = sessions.find((session) => session.status === 'REJECTED')
+  if (rejected && sessions.every((session) => session.status === 'REJECTED')) {
+    return {
+      status: 'REJECTED',
+      representative: rejected,
+      statusNote: rejected.statusNote,
+    }
+  }
+
   const cancelled = sessions.find((session) => session.status === 'CANCELLED')
   if (cancelled) {
     return {
@@ -61,12 +70,30 @@ function pickOfferStatus(sessions: AdminSession[]): {
   return { status: first.status, representative: first, statusNote: first.statusNote }
 }
 
-export type AdminPlanningFilter = 'ALL' | 'PUBLIC' | AdminSessionStatus
+export type AdminPlanningFilter =
+  | 'ALL'
+  | 'PUBLIC'
+  | 'UPCOMING'
+  | AdminSessionStatus
+
+function matchesPlanningFilter(
+  status: AdminSessionStatus,
+  statusFilter: AdminPlanningFilter,
+  onlyPublic: boolean,
+): boolean {
+  if (onlyPublic) return true
+  if (statusFilter === 'ALL') return true
+  if (statusFilter === 'UPCOMING') {
+    return status === 'PUBLISHED' || status === 'POSTPONED'
+  }
+  return status === statusFilter
+}
 
 /**
  * Planning admin : 1 ligne par séance directe,
  * 1 ligne regroupée par offre publique (offerGroupId).
  * Filtre `PUBLIC` = uniquement les offres publiques.
+ * Filtre `UPCOMING` = validées + reportées.
  */
 export function listAdminPlanningRows(
   statusFilter: AdminPlanningFilter = 'ALL',
@@ -79,7 +106,9 @@ export function listAdminPlanningRows(
   for (const session of sessions) {
     if (!session.offerGroupId || !session.isPublicOffer) {
       if (onlyPublic) continue
-      if (statusFilter !== 'ALL' && session.status !== statusFilter) continue
+      if (!matchesPlanningFilter(session.status, statusFilter, onlyPublic)) {
+        continue
+      }
       rows.push({ kind: 'session', id: session.id, session })
       continue
     }
@@ -93,8 +122,7 @@ export function listAdminPlanningRows(
     const picked = pickOfferStatus(groupSessions)
     if (
       !onlyPublic &&
-      statusFilter !== 'ALL' &&
-      picked.status !== statusFilter
+      !matchesPlanningFilter(picked.status, statusFilter, onlyPublic)
     ) {
       continue
     }

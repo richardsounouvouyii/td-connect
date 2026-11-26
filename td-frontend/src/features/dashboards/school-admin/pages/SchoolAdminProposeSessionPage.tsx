@@ -18,15 +18,17 @@ import {
 } from '@/features/dashboards/school-admin/lib/admin-sessions-store'
 import {
   ADMIN_CLASSES,
-  ADMIN_GROUPS,
   ADMIN_TRAINERS,
   getAdminTrainerById,
   listAdminSubjects,
+  listClassesForTrainer,
   listTrainersForSubjectAndClass,
 } from '@/features/dashboards/school-admin/mocks/admin-catalog'
+import { listGroupsForClassAndSubject } from '@/features/dashboards/school-admin/mocks/admin-classes'
 import {
   arePublicOffersAllowed,
   listManagedAdminRooms,
+  loadAdminSettings,
 } from '@/features/dashboards/school-admin/mocks/admin-settings'
 import {
   formatProposeDateChip,
@@ -70,6 +72,10 @@ export function SchoolAdminProposeSessionPage() {
   const [fileKind, setFileKind] = useState<TrainerDocumentKind | null>(null)
 
   const publicOffersAllowed = arePublicOffersAllowed()
+  const schoolHours = useMemo(() => {
+    const settings = loadAdminSettings()
+    return { dayStart: settings.dayStart, dayEnd: settings.dayEnd }
+  }, [])
   const rooms = useMemo(() => listManagedAdminRooms(), [])
   const [isPublic, setIsPublic] = useState(false)
   const [trainerId, setTrainerId] = useState(ADMIN_TRAINERS[0]?.id ?? '')
@@ -83,6 +89,19 @@ export function SchoolAdminProposeSessionPage() {
   useEffect(() => {
     if (!publicOffersAllowed && isPublic) setIsPublic(false)
   }, [publicOffersAllowed, isPublic])
+
+  const directClasses = useMemo(
+    () => listClassesForTrainer(trainerId),
+    [trainerId],
+  )
+  const directGroups = useMemo(
+    () => listGroupsForClassAndSubject(classLabel, subject),
+    [classLabel, subject],
+  )
+  const directTrainers = useMemo(
+    () => listTrainersForSubjectAndClass(subject, classLabel),
+    [subject, classLabel],
+  )
 
   const concernedTrainers = useMemo(
     () =>
@@ -108,15 +127,26 @@ export function SchoolAdminProposeSessionPage() {
   const [weekday, setWeekday] = useState<TrainerWeekday | undefined>(
     programmeWeekdays[0],
   )
-  const slotsForDay = useMemo(
-    () =>
+  const slotsForDay = useMemo(() => {
+    const raw =
       weekday == null
         ? []
         : isPublic
           ? listUnionSlotsForWeekday(concernedTrainerIds, weekday)
-          : listTrainerSlotsForWeekday(trainerId, weekday),
-    [isPublic, concernedTrainerIds, trainerId, weekday],
-  )
+          : listTrainerSlotsForWeekday(trainerId, weekday)
+    return raw.filter(
+      (slot) =>
+        slot.startTime >= schoolHours.dayStart &&
+        slot.endTime <= schoolHours.dayEnd,
+    )
+  }, [
+    isPublic,
+    concernedTrainerIds,
+    trainerId,
+    weekday,
+    schoolHours.dayStart,
+    schoolHours.dayEnd,
+  ])
   const [slotId, setSlotId] = useState(slotsForDay[0]?.id ?? '')
   const selectedSlot = useMemo(
     () => slotsForDay.find((slot) => slot.id === slotId) ?? slotsForDay[0],
@@ -151,7 +181,9 @@ export function SchoolAdminProposeSessionPage() {
   const [chapter, setChapter] = useState('')
   const [date, setDate] = useState(dateOptions[0] ?? '')
   const [room, setRoom] = useState(rooms[0]?.label ?? 'Salle B12')
-  const [groupLabel, setGroupLabel] = useState<string>(ADMIN_GROUPS[0])
+  const [groupLabel, setGroupLabel] = useState(
+    () => listGroupsForClassAndSubject(classLabel, subject)[0] ?? 'TD Maths A',
+  )
   const [pricing, setPricing] = useState<AdminSessionPricing>('PAID')
   const [priceCfa, setPriceCfa] = useState('1500')
   const [objectives, setObjectives] = useState('')
@@ -213,9 +245,33 @@ export function SchoolAdminProposeSessionPage() {
   const onTrainerChange = (nextId: string) => {
     setTrainerId(nextId)
     const next = getAdminTrainerById(nextId)
-    if (next?.subjects[0]) setSubject(next.subjects[0])
-    syncScheduleForSource(false, nextId, next?.subjects[0] ?? subject)
+    const nextSubject = next?.subjects[0] ?? subject
+    const nextClass = next?.classes[0] ?? classLabel
+    if (next?.subjects[0]) setSubject(nextSubject)
+    if (next?.classes[0]) setClassLabel(nextClass)
+    const groups = listGroupsForClassAndSubject(nextClass, nextSubject)
+    if (groups[0]) setGroupLabel(groups[0])
+    syncScheduleForSource(false, nextId, nextSubject, nextClass)
     setPack({})
+  }
+
+  const onDirectClassChange = (nextClass: string) => {
+    setClassLabel(nextClass)
+    const trainers = listTrainersForSubjectAndClass(subject, nextClass)
+    if (
+      trainers.length > 0 &&
+      !trainers.some((trainer) => trainer.id === trainerId)
+    ) {
+      setTrainerId(trainers[0]!.id)
+      const nextSubject = trainers[0]!.subjects[0] ?? subject
+      setSubject(nextSubject)
+      const groups = listGroupsForClassAndSubject(nextClass, nextSubject)
+      if (groups[0]) setGroupLabel(groups[0])
+      syncScheduleForSource(false, trainers[0]!.id, nextSubject, nextClass)
+      return
+    }
+    const groups = listGroupsForClassAndSubject(nextClass, subject)
+    if (groups[0]) setGroupLabel(groups[0])
   }
 
   const onPublicToggle = (next: boolean) => {
@@ -233,11 +289,15 @@ export function SchoolAdminProposeSessionPage() {
 
   const onSubjectChange = (nextSubject: string) => {
     setSubject(nextSubject)
+    const groups = listGroupsForClassAndSubject(classLabel, nextSubject)
+    if (groups[0]) setGroupLabel(groups[0])
     if (isPublic) syncScheduleForSource(true, trainerId, nextSubject, classLabel)
   }
 
   const onClassChange = (nextClass: string) => {
     setClassLabel(nextClass)
+    const groups = listGroupsForClassAndSubject(nextClass, subject)
+    if (groups[0]) setGroupLabel(groups[0])
     if (isPublic) syncScheduleForSource(true, trainerId, subject, nextClass)
   }
 
@@ -246,6 +306,17 @@ export function SchoolAdminProposeSessionPage() {
       setDate(dateOptions[0]!)
     }
   }, [dateOptions, date])
+
+  useEffect(() => {
+    if (!isPublic && directClasses.length > 0 && !directClasses.includes(classLabel)) {
+      setClassLabel(directClasses[0]!)
+    }
+  }, [isPublic, directClasses, classLabel])
+
+  useEffect(() => {
+    if (directGroups.length === 0) return
+    if (!directGroups.includes(groupLabel)) setGroupLabel(directGroups[0]!)
+  }, [directGroups, groupLabel])
 
   useEffect(() => {
     if (slotsForDay.length === 0) return
@@ -535,11 +606,13 @@ export function SchoolAdminProposeSessionPage() {
               value={trainerId}
               onChange={(event) => onTrainerChange(event.target.value)}
             >
-              {ADMIN_TRAINERS.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.fullName}
-                </option>
-              ))}
+              {(directTrainers.length > 0 ? directTrainers : ADMIN_TRAINERS).map(
+                (item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.fullName}
+                  </option>
+                ),
+              )}
             </select>
           </label>
         )}
@@ -666,9 +739,12 @@ export function SchoolAdminProposeSessionPage() {
               <select
                 className="select select-bordered w-full"
                 value={classLabel}
-                onChange={(event) => setClassLabel(event.target.value)}
+                onChange={(event) => onDirectClassChange(event.target.value)}
               >
-                {ADMIN_CLASSES.map((item) => (
+                {(directClasses.length > 0
+                  ? directClasses
+                  : [...ADMIN_CLASSES]
+                ).map((item) => (
                   <option key={item} value={item}>
                     {item}
                   </option>
@@ -683,11 +759,13 @@ export function SchoolAdminProposeSessionPage() {
               value={groupLabel}
               onChange={(event) => setGroupLabel(event.target.value)}
             >
-              {ADMIN_GROUPS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
+              {(directGroups.length > 0 ? directGroups : [groupLabel]).map(
+                (item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ),
+              )}
             </select>
           </label>
         </div>

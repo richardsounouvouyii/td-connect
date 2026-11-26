@@ -74,3 +74,8 @@ export function listTrainersForSubjectAndClass(
       trainer.classes.includes(classLabel),
   )
 }
+
+/** Classes d’un formateur. */
+export function listClassesForTrainer(trainerId: string): string[] {
+  return getAdminTrainerById(trainerId)?.classes ?? [...ADMIN_CLASSES]
+}

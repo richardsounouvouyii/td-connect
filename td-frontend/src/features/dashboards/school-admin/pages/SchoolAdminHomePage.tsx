@@ -61,7 +61,7 @@ export function SchoolAdminHomePage() {
           tone="warning"
         />
         <StatCard
-          to="/admin-etablissement/planning?statut=PUBLISHED"
+          to="/admin-etablissement/planning?statut=UPCOMING"
           icon={CalendarDays}
           label="Séances à venir"
           value={stats.upcoming}

@@ -102,12 +102,14 @@ export function acceptTrainerSession(sessionId: string): {
 }
 
 export function refuseTrainerSession(sessionId: string, reason: string) {
+  const note = reason.trim() || 'Refusée par le formateur.'
   const map = readDecisions()
   map[sessionId] = {
     status: 'REJECTED',
-    statusNote: reason.trim() || 'Refusée par le formateur.',
+    statusNote: note,
   }
   writeDecisions(map)
+  patchAdminSessionStatus(sessionId, 'REJECTED', note)
 }
 
 /** Séance à valider : bouton Valider sur la liste. */

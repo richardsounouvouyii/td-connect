@@ -1,4 +1,5 @@
 import { STUDENT_NOTIFICATIONS } from '@/features/dashboards/student/mocks/student-notifications'
+import { getStudentExtraNotifications } from '@/features/dashboards/student/lib/student-notifications-store'
 import type { StudentNotification } from '@/features/dashboards/student/types'
 
 const STORAGE_KEY = 'tdc.student.readAlerts'
@@ -26,9 +27,9 @@ export function isAlertRead(notification: StudentNotification): boolean {
   return notification.read
 }
 
-/** Liste démo avec état lu (mock + sessionStorage). */
+/** Liste démo avec état lu (mock + extras sessionStorage). */
 export function listStudentAlerts(): StudentNotification[] {
-  return [...STUDENT_NOTIFICATIONS]
+  return [...getStudentExtraNotifications(), ...STUDENT_NOTIFICATIONS]
     .map((notification) => ({
       ...notification,
       read: isAlertRead(notification),

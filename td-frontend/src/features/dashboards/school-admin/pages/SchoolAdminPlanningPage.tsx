@@ -32,6 +32,7 @@ type StatusFilter = AdminPlanningFilter
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'ALL', label: 'Toutes' },
+  { id: 'UPCOMING', label: 'À venir' },
   { id: 'PUBLIC', label: 'Publiques' },
   { id: 'PENDING', label: 'Attente formateur' },
   { id: 'PUBLISHED', label: 'Validées' },
@@ -42,7 +43,10 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
 ]
 
 function isStatusFilter(value: string | null): value is StatusFilter {
-  return STATUS_FILTERS.some((filter) => filter.id === value)
+  return (
+    value === 'UPCOMING' ||
+    STATUS_FILTERS.some((filter) => filter.id === value)
+  )
 }
 
 function buildPlanningParams(next: {
