@@ -13,7 +13,7 @@ export const trainerNav: NavItem[] = [
   { to: '/formateur', label: 'Accueil', icon: Home, mobile: true },
   {
     to: '/formateur/disponibilites',
-    label: 'Disponibilités',
+    label: 'Programme',
     icon: CalendarDays,
     mobile: true,
   },

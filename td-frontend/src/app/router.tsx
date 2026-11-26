@@ -18,7 +18,11 @@ import { StudentPlanningPage } from '@/features/dashboards/student/pages/Student
 import { StudentProfilePage } from '@/features/dashboards/student/pages/StudentProfilePage'
 import { StudentSessionDetailPage } from '@/features/dashboards/student/pages/StudentSessionDetailPage'
 import { SuperAdminHomePage } from '@/features/dashboards/super-admin/pages/SuperAdminHomePage'
+import { TrainerAvailabilityPage } from '@/features/dashboards/trainer/pages/TrainerAvailabilityPage'
+import { TrainerDocumentsPage } from '@/features/dashboards/trainer/pages/TrainerDocumentsPage'
 import { TrainerHomePage } from '@/features/dashboards/trainer/pages/TrainerHomePage'
+import { TrainerSessionDetailPage } from '@/features/dashboards/trainer/pages/TrainerSessionDetailPage'
+import { TrainerSessionsPage } from '@/features/dashboards/trainer/pages/TrainerSessionsPage'
 
 export function AppRouter() {
   return (
@@ -57,9 +61,16 @@ export function AppRouter() {
         >
           <Route element={<TrainerLayout />}>
             <Route index element={<TrainerHomePage />} />
-            <Route path="disponibilites" element={<SectionPlaceholderPage />} />
-            <Route path="seances" element={<SectionPlaceholderPage />} />
-            <Route path="documents" element={<SectionPlaceholderPage />} />
+            <Route
+              path="disponibilites"
+              element={<TrainerAvailabilityPage />}
+            />
+            <Route path="seances" element={<TrainerSessionsPage />} />
+            <Route
+              path="seances/:sessionId"
+              element={<TrainerSessionDetailPage />}
+            />
+            <Route path="documents" element={<TrainerDocumentsPage />} />
             <Route path="notifications" element={<SectionPlaceholderPage />} />
             <Route path="profil" element={<SectionPlaceholderPage />} />
           </Route>
