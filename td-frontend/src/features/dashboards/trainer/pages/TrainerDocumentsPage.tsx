@@ -12,13 +12,14 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
-import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useToast } from '@/components/feedback/ToastProvider'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FilterChip } from '@/features/dashboards/student/components/FilterChip'
 import { downloadDemoPdf } from '@/features/dashboards/student/lib/download-demo-pdf'
+import { AdminPrepPackBlock } from '@/features/dashboards/trainer/components/AdminPrepPackBlock'
 import { TrainerSessionStatusBadge } from '@/features/dashboards/trainer/components/TrainerSessionStatusBadge'
 import {
   formatSessionDate,
@@ -27,6 +28,11 @@ import {
   trainerPricingLabel,
 } from '@/features/dashboards/trainer/lib/format'
 import {
+  isAdminPackSeen,
+  listEligibleAdminPackSessionIds,
+  markAllAdminPacksSeen,
+} from '@/features/dashboards/trainer/lib/trainer-admin-pack-reads'
+import {
   buildDocumentFromFile,
   canPublishCorrection,
   canPublishExam,
@@ -34,6 +40,7 @@ import {
   loadTrainerDocuments,
   saveTrainerDocuments,
 } from '@/features/dashboards/trainer/lib/trainer-documents-store'
+import { getTrainerAdminPack } from '@/features/dashboards/trainer/mocks/trainer-admin-packs'
 import { getTrainerDocument } from '@/features/dashboards/trainer/mocks/trainer-documents'
 import { listTrainerSessions } from '@/features/dashboards/trainer/mocks/trainer-sessions'
 import type {
@@ -67,6 +74,14 @@ export function TrainerDocumentsPage() {
     null,
   )
   const [fileIntent, setFileIntent] = useState<FileIntent | null>(null)
+  /** Snapshot des packs « nouveaux » avant de marquer la page comme vue. */
+  const [newPackIds] = useState(() =>
+    listEligibleAdminPackSessionIds().filter((id) => !isAdminPackSeen(id)),
+  )
+
+  useEffect(() => {
+    markAllAdminPacksSeen()
+  }, [])
 
   const persist = (next: TrainerDocument[]) => {
     setDocuments(next)
@@ -260,8 +275,8 @@ export function TrainerDocumentsPage() {
           Documents
         </h1>
         <p className="mt-1 font-sans text-base text-base-content/90">
-          Publiez l’épreuve (PDF), puis le corrigé après la séance. Les élèves
-          les retrouvent dans Épreuves.
+          Téléchargez le pack admin pour préparer, puis publiez l’épreuve aux
+          élèves (corrigé après la séance).
         </p>
       </header>
 
@@ -272,12 +287,12 @@ export function TrainerDocumentsPage() {
         <div className="min-w-0 flex-1">
           <p className="font-medium">
             {missingTotal === 0
-              ? 'Tout est à jour'
-              : `${missingTotal} document${missingTotal > 1 ? 's' : ''} à publier`}
+              ? 'Publications élèves à jour'
+              : `${missingTotal} document${missingTotal > 1 ? 's' : ''} à publier aux élèves`}
           </p>
           <p className="text-sm text-base-content/90">
             {documents.length} fichier{documents.length > 1 ? 's' : ''} en ligne
-            · épreuve d’abord, corrigé après la séance
+            · pack admin = préparation · publication = élèves
           </p>
         </div>
       </div>
@@ -339,6 +354,7 @@ export function TrainerDocumentsPage() {
                   session={row.session}
                   exam={row.exam}
                   correction={row.correction}
+                  adminPackIsNew={newPackIds.includes(row.session.id)}
                   onPublish={requestPublish}
                   onReplace={requestReplace}
                   onDownload={handleDownload}
@@ -378,6 +394,7 @@ function SessionDocumentsCard({
   session,
   exam,
   correction,
+  adminPackIsNew,
   onPublish,
   onReplace,
   onDownload,
@@ -386,6 +403,7 @@ function SessionDocumentsCard({
   session: TrainerSession
   exam?: TrainerDocument
   correction?: TrainerDocument
+  adminPackIsNew: boolean
   onPublish: (session: TrainerSession, kind: TrainerDocumentKind) => void
   onReplace: (document: TrainerDocument) => void
   onDownload: (document: TrainerDocument) => void
@@ -394,6 +412,7 @@ function SessionDocumentsCard({
   const [detailsOpen, setDetailsOpen] = useState(false)
   const priceLabel = formatTrainerSessionPrice(session)
   const correctionGate = canPublishCorrection(session, Boolean(exam))
+  const adminPack = getTrainerAdminPack(session.id)
 
   return (
     <article className="rounded-xl border border-base-300 bg-white p-4 font-sans">
@@ -479,32 +498,45 @@ function SessionDocumentsCard({
         </div>
       </div>
 
-      <ul className="mt-4 flex flex-col gap-2">
-        <DocumentSlot
-          kind="EXAM"
-          document={exam}
-          disabled={false}
-          disabledHint={undefined}
-          onPublish={() => onPublish(session, 'EXAM')}
-          onReplace={onReplace}
-          onDownload={onDownload}
-          onRemove={onRemove}
-        />
-        <DocumentSlot
-          kind="CORRECTION"
-          document={correction}
-          disabled={!correction && !correctionGate.ok}
-          disabledHint={
-            !correction && !correctionGate.ok
-              ? correctionGate.message
-              : undefined
-          }
-          onPublish={() => onPublish(session, 'CORRECTION')}
-          onReplace={onReplace}
-          onDownload={onDownload}
-          onRemove={onRemove}
-        />
-      </ul>
+      <AdminPrepPackBlock
+        className="mt-4"
+        pack={adminPack}
+        downloadEnabled
+        sessionId={session.id}
+        isNew={adminPackIsNew}
+      />
+
+      <div className="mt-4">
+        <p className="mb-2 text-sm font-medium text-base-content">
+          Publication élèves
+        </p>
+        <ul className="flex flex-col gap-2">
+          <DocumentSlot
+            kind="EXAM"
+            document={exam}
+            disabled={false}
+            disabledHint={undefined}
+            onPublish={() => onPublish(session, 'EXAM')}
+            onReplace={onReplace}
+            onDownload={onDownload}
+            onRemove={onRemove}
+          />
+          <DocumentSlot
+            kind="CORRECTION"
+            document={correction}
+            disabled={!correction && !correctionGate.ok}
+            disabledHint={
+              !correction && !correctionGate.ok
+                ? correctionGate.message
+                : undefined
+            }
+            onPublish={() => onPublish(session, 'CORRECTION')}
+            onReplace={onReplace}
+            onDownload={onDownload}
+            onRemove={onRemove}
+          />
+        </ul>
+      </div>
     </article>
   )
 }

@@ -1,4 +1,12 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns'
+import {
+  claimPublicOfferSession,
+  findOfferGroupBySessionId,
+  getAdminExtraSessions,
+  mergeAdminSessionOverrides,
+  patchAdminSessionStatus,
+} from '@/features/dashboards/school-admin/lib/admin-sessions-store'
+import { getAdminTrainerById } from '@/features/dashboards/school-admin/mocks/admin-catalog'
 import { PLANNING_DEMO_TODAY } from '@/features/dashboards/student/lib/planning'
 import type {
   TrainerSession,
@@ -11,7 +19,7 @@ const STORAGE_KEY = 'tdc.trainer.sessionDecisions'
 export const REFUSE_MIN_DAYS_BEFORE = 2
 
 type SessionDecision = {
-  status: Extract<TrainerSessionStatus, 'PUBLISHED' | 'REJECTED'>
+  status: Extract<TrainerSessionStatus, 'PUBLISHED' | 'REJECTED' | 'CANCELLED'>
   statusNote?: string
 }
 
@@ -46,10 +54,51 @@ export function resolveTrainerSession(
   }
 }
 
-export function acceptTrainerSession(sessionId: string) {
+export function acceptTrainerSession(sessionId: string): {
+  ok: boolean
+  reason?: string
+} {
+  const extras = getAdminExtraSessions().map(mergeAdminSessionOverrides)
+  const extra = extras.find((session) => session.id === sessionId)
+  const winnerName =
+    extra?.trainerName ??
+    (extra ? getAdminTrainerById(extra.trainerId)?.fullName : undefined) ??
+    'un formateur'
+
+  if (extra?.offerGroupId || findOfferGroupBySessionId(sessionId)) {
+    const claim = claimPublicOfferSession(sessionId, winnerName)
+    if (!claim.ok) {
+      const map = readDecisions()
+      map[sessionId] = {
+        status: 'CANCELLED',
+        statusNote: claim.reason,
+      }
+      writeDecisions(map)
+      return { ok: false, reason: claim.reason }
+    }
+
+    const group = findOfferGroupBySessionId(sessionId)
+    const map = readDecisions()
+    map[sessionId] = { status: 'PUBLISHED' }
+    if (group) {
+      const takenNote = `Cette proposition publique a déjà été validée par ${winnerName}. Vous ne pouvez plus la valider.`
+      for (const siblingId of group.sessionIds) {
+        if (siblingId === sessionId) continue
+        map[siblingId] = {
+          status: 'CANCELLED',
+          statusNote: takenNote,
+        }
+      }
+    }
+    writeDecisions(map)
+    return { ok: true }
+  }
+
   const map = readDecisions()
   map[sessionId] = { status: 'PUBLISHED' }
   writeDecisions(map)
+  patchAdminSessionStatus(sessionId, 'PUBLISHED')
+  return { ok: true }
 }
 
 export function refuseTrainerSession(sessionId: string, reason: string) {
@@ -79,4 +128,13 @@ export function canRefuseValidatedSession(
   }
   const daysBefore = differenceInCalendarDays(parseISO(session.date), today)
   return daysBefore >= REFUSE_MIN_DAYS_BEFORE
+}
+
+/** Message clair si l’offre publique a été prise ailleurs. */
+export function isPublicOfferTaken(session: TrainerSession): boolean {
+  return (
+    session.status === 'CANCELLED' &&
+    Boolean(session.isPublicOffer || session.offerGroupId) &&
+    Boolean(session.statusNote?.toLowerCase().includes('déjà été validée'))
+  )
 }

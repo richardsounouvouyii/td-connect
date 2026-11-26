@@ -1,4 +1,6 @@
+import { getTrainerExtraNotifications } from '@/features/dashboards/trainer/lib/trainer-notifications-store'
 import { TRAINER_NOTIFICATIONS } from '@/features/dashboards/trainer/mocks/trainer-notifications'
+import { DEMO_TRAINER_ID } from '@/features/dashboards/trainer/mocks/trainer-sessions'
 import type { TrainerNotification } from '@/features/dashboards/trainer/types'
 
 const STORAGE_KEY = 'tdc.trainer.readAlerts'
@@ -28,8 +30,14 @@ export function isTrainerAlertRead(
   return notification.read
 }
 
-export function listTrainerAlerts(): TrainerNotification[] {
-  return [...TRAINER_NOTIFICATIONS]
+export function listTrainerAlerts(
+  trainerId: string = DEMO_TRAINER_ID,
+): TrainerNotification[] {
+  const extras = getTrainerExtraNotifications()
+    .filter((notification) => notification.trainerId === trainerId)
+    .map(({ trainerId: _trainerId, ...notification }) => notification)
+
+  return [...extras, ...TRAINER_NOTIFICATIONS]
     .map((notification) => ({
       ...notification,
       read: isTrainerAlertRead(notification),
@@ -52,7 +60,7 @@ export function markTrainerAlertRead(id: string) {
 export function markAllTrainerAlertsRead() {
   const ids = readMarkedIds()
   let changed = false
-  for (const notification of TRAINER_NOTIFICATIONS) {
+  for (const notification of listTrainerAlerts()) {
     if (!ids.has(notification.id) && !notification.read) {
       ids.add(notification.id)
       changed = true

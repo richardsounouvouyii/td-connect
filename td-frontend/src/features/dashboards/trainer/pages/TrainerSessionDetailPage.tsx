@@ -11,11 +11,12 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { useToast } from '@/components/feedback/ToastProvider'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { AdminPrepPackBlock } from '@/features/dashboards/trainer/components/AdminPrepPackBlock'
 import { TrainerSessionStatusBadge } from '@/features/dashboards/trainer/components/TrainerSessionStatusBadge'
 import {
   formatSessionDate,
@@ -25,9 +26,15 @@ import {
 import {
   acceptTrainerSession,
   canRefuseValidatedSession,
+  isPublicOfferTaken,
   REFUSE_MIN_DAYS_BEFORE,
   refuseTrainerSession,
 } from '@/features/dashboards/trainer/lib/session-decisions'
+import {
+  isAdminPackSeen,
+  markAdminPackSeen,
+} from '@/features/dashboards/trainer/lib/trainer-admin-pack-reads'
+import { getTrainerAdminPack } from '@/features/dashboards/trainer/mocks/trainer-admin-packs'
 import { getTrainerSessionById } from '@/features/dashboards/trainer/mocks/trainer-sessions'
 import { cn } from '@/lib/cn'
 
@@ -51,18 +58,45 @@ export function TrainerSessionDetailPage() {
 
   const priceLabel = formatTrainerSessionPrice(session)
   const isPending = session.status === 'PENDING'
+  const offerTaken = isPublicOfferTaken(session)
   const showEnrollment =
     session.status === 'PUBLISHED' || session.status === 'POSTPONED'
   const noStudents = showEnrollment && session.seatsTaken === 0
   const canRefuseValidated = canRefuseValidatedSession(session)
+  const adminPack = getTrainerAdminPack(session.id)
+  const packDownloadEnabled =
+    session.status === 'PUBLISHED' ||
+    session.status === 'POSTPONED' ||
+    session.status === 'COMPLETED'
+  const [adminPackIsNew] = useState(
+    () => Boolean(adminPack) && !isAdminPackSeen(session.id),
+  )
+
+  useEffect(() => {
+    if (packDownloadEnabled && adminPack) {
+      markAdminPackSeen(session.id)
+    }
+  }, [adminPack, packDownloadEnabled, session.id])
 
   const handleAccept = () => {
-    acceptTrainerSession(session.id)
+    const result = acceptTrainerSession(session.id)
     setConfirmAccept(false)
     setVersion((v) => v + 1)
+    if (!result.ok) {
+      pushToast({
+        title: 'Plus disponible',
+        description:
+          result.reason ??
+          'Un autre formateur a déjà validé cette proposition publique.',
+        tone: 'warning',
+      })
+      return
+    }
     pushToast({
       title: 'Séance validée',
-      description: 'Badge Validée — les élèves peuvent s’inscrire.',
+      description: session.isPublicOffer
+        ? 'Vous avez obtenu cette proposition publique. Les autres formateurs ne peuvent plus valider.'
+        : 'Badge Validée — les élèves peuvent s’inscrire.',
       tone: 'success',
     })
   }
@@ -94,7 +128,11 @@ export function TrainerSessionDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium tracking-wide text-primary uppercase">
-              {isPending ? 'Proposition admin' : 'Séance TD'}
+              {session.isPublicOffer
+                ? 'Proposition publique'
+                : isPending
+                  ? 'Proposition admin'
+                  : 'Séance TD'}
             </p>
             <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
               {session.subject}
@@ -171,13 +209,25 @@ export function TrainerSessionDetailPage() {
           </span>
         </div>
 
-        {session.proposalNote && isPending ? (
-          <p className="mt-4 rounded-lg bg-primary/5 px-3 py-2 text-sm text-base-content/90">
-            {session.proposalNote}
-          </p>
+        {session.proposalNote ? (
+          <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
+            <p className="text-xs font-medium tracking-wide text-primary uppercase">
+              Note de l’administration
+            </p>
+            <p className="mt-1 text-sm whitespace-pre-line text-base-content/90">
+              {session.proposalNote}
+            </p>
+          </div>
         ) : null}
 
-        {session.statusNote ? (
+        {offerTaken ? (
+          <p
+            role="status"
+            className="mt-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm font-medium text-base-content"
+          >
+            {session.statusNote}
+          </p>
+        ) : session.statusNote ? (
           <p className="mt-4 rounded-lg bg-base-200/70 px-3 py-2 text-sm text-base-content/90">
             {session.statusNote}
           </p>
@@ -185,7 +235,9 @@ export function TrainerSessionDetailPage() {
 
         {session.objectives ? (
           <div className="mt-4 border-t border-base-200 pt-4">
-            <h2 className="font-display text-lg font-semibold">Objectifs</h2>
+            <h2 className="font-display text-lg font-semibold">
+              Objectifs (admin)
+            </h2>
             <p className="mt-1 text-base text-base-content/90">
               {session.objectives}
             </p>
@@ -338,43 +390,56 @@ export function TrainerSessionDetailPage() {
         </section>
       ) : null}
 
-      {!isPending ? (
-        <section className="rounded-xl border border-base-300 bg-white p-4 font-sans sm:p-5">
-          <h2 className="font-display text-xl font-semibold tracking-tight">
-            Documents liés
-          </h2>
-          <ul className="mt-3 flex flex-col gap-2">
-            <li className="flex items-center gap-3 rounded-lg border border-base-200 px-3 py-2.5">
-              <BookOpen className="size-4 text-primary" aria-hidden />
-              <span className="flex-1 text-sm">
-                Épreuve{' '}
-                {session.hasExam ? (
-                  <span className="text-success">publiée</span>
-                ) : (
-                  <span className="text-base-content/70">pas encore</span>
-                )}
-              </span>
-            </li>
-            <li className="flex items-center gap-3 rounded-lg border border-base-200 px-3 py-2.5">
-              <FileCheck2 className="size-4 text-success" aria-hidden />
-              <span className="flex-1 text-sm">
-                Corrigé{' '}
-                {session.hasCorrection ? (
-                  <span className="text-success">publié</span>
-                ) : (
-                  <span className="text-base-content/70">pas encore</span>
-                )}
-              </span>
-            </li>
-          </ul>
-          <Link
-            to="/formateur/documents"
-            className="link link-primary mt-3 inline-flex min-h-11 items-center text-sm no-underline"
-          >
-            Gérer les documents
-          </Link>
-        </section>
-      ) : null}
+      <section className="rounded-xl border border-base-300 bg-white p-4 font-sans sm:p-5">
+        <h2 className="font-display text-xl font-semibold tracking-tight">
+          Documents
+        </h2>
+        <AdminPrepPackBlock
+          className="mt-3"
+          pack={adminPack}
+          downloadEnabled={packDownloadEnabled}
+          sessionId={session.id}
+          isNew={adminPackIsNew && packDownloadEnabled}
+        />
+
+        {!isPending ? (
+          <>
+            <p className="mt-4 text-sm font-medium text-base-content">
+              Publication élèves
+            </p>
+            <ul className="mt-2 flex flex-col gap-2">
+              <li className="flex items-center gap-3 rounded-lg border border-base-200 px-3 py-2.5">
+                <BookOpen className="size-4 text-primary" aria-hidden />
+                <span className="flex-1 text-sm">
+                  Épreuve{' '}
+                  {session.hasExam ? (
+                    <span className="text-success">publiée</span>
+                  ) : (
+                    <span className="text-base-content/70">pas encore</span>
+                  )}
+                </span>
+              </li>
+              <li className="flex items-center gap-3 rounded-lg border border-base-200 px-3 py-2.5">
+                <FileCheck2 className="size-4 text-success" aria-hidden />
+                <span className="flex-1 text-sm">
+                  Corrigé{' '}
+                  {session.hasCorrection ? (
+                    <span className="text-success">publié</span>
+                  ) : (
+                    <span className="text-base-content/70">pas encore</span>
+                  )}
+                </span>
+              </li>
+            </ul>
+            <Link
+              to="/formateur/documents"
+              className="link link-primary mt-3 inline-flex min-h-11 items-center text-sm no-underline"
+            >
+              Gérer la publication élèves
+            </Link>
+          </>
+        ) : null}
+      </section>
 
       <ConfirmDialog
         open={confirmAccept}

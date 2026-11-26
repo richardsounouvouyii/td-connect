@@ -1,7 +1,43 @@
+import {
+  getAdminExtraSessions,
+  mergeAdminSessionOverrides,
+} from '@/features/dashboards/school-admin/lib/admin-sessions-store'
+import { getDemoPublicOfferSessionsForTrainer } from '@/features/dashboards/school-admin/mocks/admin-demo-public-offers'
+import type { AdminSession } from '@/features/dashboards/school-admin/types'
 import { resolveTrainerSession } from '@/features/dashboards/trainer/lib/session-decisions'
 import type { TrainerSession } from '@/features/dashboards/trainer/types'
 
 const ESTABLISHMENT = 'Lycée Démo Porto-Novo'
+
+/** Dashboard formateur démo = Jean Formateur. */
+export const DEMO_TRAINER_ID = 'user-trainer-1'
+
+function adminSessionToTrainer(session: AdminSession): TrainerSession {
+  return {
+    id: session.id,
+    subject: session.subject,
+    chapter: session.chapter,
+    date: session.date,
+    startTime: session.startTime,
+    endTime: session.endTime,
+    room: session.room,
+    groupLabel: session.groupLabel,
+    classLabel: session.classLabel,
+    status: session.status,
+    establishmentName: session.establishmentName,
+    seatsTotal: session.seatsTotal,
+    seatsTaken: session.seatsTaken,
+    pricing: session.pricing,
+    priceCfa: session.priceCfa,
+    objectives: session.objectives,
+    statusNote: session.statusNote,
+    proposalNote: session.proposalNote,
+    hasExam: session.studentExamPublished,
+    hasCorrection: session.studentCorrectionPublished,
+    offerGroupId: session.offerGroupId,
+    isPublicOffer: session.isPublicOffer,
+  }
+}
 
 /** Séances de Jean Formateur — alignées sur le planning élève + propositions. */
 export const TRAINER_SESSIONS: TrainerSession[] = [
@@ -244,15 +280,35 @@ export const TRAINER_SESSIONS: TrainerSession[] = [
   },
 ]
 
-export function listTrainerSessions(): TrainerSession[] {
+/** Séances mock Jean uniquement (pour le planning admin). */
+export function listTrainerMockSessions(): TrainerSession[] {
   return TRAINER_SESSIONS.map(resolveTrainerSession)
+}
+
+/** Séances du dashboard formateur : mocks + propositions admin (dont publiques). */
+export function listTrainerSessions(
+  trainerId: string = DEMO_TRAINER_ID,
+): TrainerSession[] {
+  const base = TRAINER_SESSIONS.map(resolveTrainerSession)
+  const fromDemoPublic = getDemoPublicOfferSessionsForTrainer(trainerId)
+    .map(mergeAdminSessionOverrides)
+    .map((session) => resolveTrainerSession(adminSessionToTrainer(session)))
+  const fromAdmin = getAdminExtraSessions()
+    .map(mergeAdminSessionOverrides)
+    .filter((session) => session.trainerId === trainerId)
+    .map((session) => resolveTrainerSession(adminSessionToTrainer(session)))
+
+  const byId = new Map<string, TrainerSession>()
+  for (const session of [...base, ...fromDemoPublic, ...fromAdmin]) {
+    byId.set(session.id, session)
+  }
+  return [...byId.values()]
 }
 
 export function getTrainerSessionById(
   id: string,
 ): TrainerSession | undefined {
-  const session = TRAINER_SESSIONS.find((item) => item.id === id)
-  return session ? resolveTrainerSession(session) : undefined
+  return listTrainerSessions().find((item) => item.id === id)
 }
 
 export function upcomingTrainerSessions(

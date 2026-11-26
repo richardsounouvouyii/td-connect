@@ -12,6 +12,7 @@ import { SiteFooter } from '@/components/navigation/shared/SiteFooter'
 import { Topbar } from '@/components/navigation/shared/Topbar'
 import { useAuth } from '@/features/auth/context/AuthContext'
 import { useUnreadAlertCount } from '@/features/dashboards/student/lib/use-unread-alert-count'
+import { useUnreadAdminPackCount } from '@/features/dashboards/trainer/lib/use-unread-admin-pack-count'
 import { useUnreadTrainerAlertCount } from '@/features/dashboards/trainer/lib/use-unread-trainer-alert-count'
 import type { Role } from '@/lib/auth/roles'
 
@@ -39,6 +40,7 @@ export function AppShell({ useBottomNav = false }: AppShellProps) {
   const [logoutOpen, setLogoutOpen] = useState(false)
   const studentUnread = useUnreadAlertCount()
   const trainerUnread = useUnreadTrainerAlertCount()
+  const trainerPackUnread = useUnreadAdminPackCount()
 
   const items = useMemo(() => {
     if (!user) return []
@@ -50,15 +52,19 @@ export function AppShell({ useBottomNav = false }: AppShellProps) {
           : item,
       )
     }
-    if (user.role === 'TRAINER' && trainerUnread > 0) {
-      return base.map((item) =>
-        item.to === '/formateur/notifications'
-          ? { ...item, badge: trainerUnread }
-          : item,
-      )
+    if (user.role === 'TRAINER') {
+      return base.map((item) => {
+        if (item.to === '/formateur/notifications' && trainerUnread > 0) {
+          return { ...item, badge: trainerUnread }
+        }
+        if (item.to === '/formateur/documents' && trainerPackUnread > 0) {
+          return { ...item, badge: trainerPackUnread }
+        }
+        return item
+      })
     }
     return base
-  }, [user, studentUnread, trainerUnread])
+  }, [user, studentUnread, trainerUnread, trainerPackUnread])
 
   if (!user) return null
 

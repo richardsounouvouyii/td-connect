@@ -38,6 +38,7 @@ function categoryOf(kind: TrainerNotificationKind): CategoryFilter {
     case 'NO_ENROLLMENT':
       return 'SESSION'
     case 'EXAM_MISSING':
+    case 'ADMIN_PACK_READY':
       return 'DOCUMENT'
     case 'REMINDER':
       return 'REMINDER'
@@ -58,6 +59,8 @@ function kindLabel(kind: TrainerNotificationKind): string {
       return 'Annulation'
     case 'EXAM_MISSING':
       return 'Documents'
+    case 'ADMIN_PACK_READY':
+      return 'Pack admin'
     case 'NO_ENROLLMENT':
       return 'Inscriptions'
     case 'REMINDER':
@@ -69,6 +72,7 @@ function NotificationIcon({ kind }: { kind: TrainerNotificationKind }) {
   const className = 'size-4'
   switch (kind) {
     case 'EXAM_MISSING':
+    case 'ADMIN_PACK_READY':
       return <BookOpen className={className} aria-hidden />
     case 'NO_ENROLLMENT':
       return <Users className={className} aria-hidden />
@@ -149,7 +153,7 @@ export function TrainerNotificationsPage() {
             Alertes
           </h1>
           <p className="mt-1 font-sans text-base text-base-content/90">
-            Propositions à valider, documents manquants et rappels.
+            Propositions, packs admin, publications élèves et rappels.
             {unreadCount > 0
               ? ` ${unreadCount} non lue${unreadCount > 1 ? 's' : ''}.`
               : ' Tout est à jour.'}

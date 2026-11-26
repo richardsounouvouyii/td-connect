@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -33,6 +34,8 @@ type ToastContextValue = {
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null)
+
+const MAX_VISIBLE_TOASTS = 3
 
 const toneShellClass: Record<ToastTone, string> = {
   success: 'border-success/50 bg-white text-base-content',
@@ -88,16 +91,19 @@ export function ToastProvider({ children }: ToastProviderProps) {
           : options
 
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      setToasts((current) => [
-        ...current,
-        {
-          id,
-          title: normalized.title,
-          description: normalized.description,
-          tone: normalized.tone ?? 'success',
-          durationMs: normalized.durationMs ?? 4000,
-        },
-      ])
+      setToasts((current) => {
+        const next = [
+          ...current,
+          {
+            id,
+            title: normalized.title,
+            description: normalized.description,
+            tone: normalized.tone ?? 'success',
+            durationMs: normalized.durationMs ?? 4000,
+          },
+        ]
+        return next.slice(-MAX_VISIBLE_TOASTS)
+      })
     },
     [],
   )
@@ -113,11 +119,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
           aria-live="polite"
         >
           {toasts.map((toast) => (
-            <ToastCard
-              key={toast.id}
-              toast={toast}
-              onDone={() => dismiss(toast.id)}
-            />
+            <ToastCard key={toast.id} toast={toast} onDismiss={dismiss} />
           ))}
         </div>,
         document.body,
@@ -136,32 +138,43 @@ export function useToast() {
 
 function ToastCard({
   toast,
-  onDone,
+  onDismiss,
 }: {
   toast: ToastItem
-  onDone: () => void
+  onDismiss: (id: string) => void
 }) {
   const [progress, setProgress] = useState(100)
+  const onDismissRef = useRef(onDismiss)
   const Icon = toneIcon[toast.tone]
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss
+  }, [onDismiss])
 
   useEffect(() => {
     const startedAt = performance.now()
     let frame = 0
+    let cancelled = false
 
     const tick = (now: number) => {
+      if (cancelled) return
       const elapsed = now - startedAt
       const next = Math.max(0, 100 - (elapsed / toast.durationMs) * 100)
       setProgress(next)
       if (next <= 0) {
-        onDone()
+        onDismissRef.current(toast.id)
         return
       }
       frame = requestAnimationFrame(tick)
     }
 
     frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [onDone, toast.durationMs])
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(frame)
+    }
+    // Uniquement id + durée : ne pas relancer si le parent re-rend.
+  }, [toast.id, toast.durationMs])
 
   return (
     <div
@@ -192,7 +205,7 @@ function ToastCard({
         type="button"
         className="btn btn-ghost btn-xs btn-square absolute top-2 right-2 min-h-8 min-w-8"
         aria-label="Fermer"
-        onClick={onDone}
+        onClick={() => onDismiss(toast.id)}
       >
         <X className="size-4" aria-hidden />
       </button>

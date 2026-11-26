@@ -23,6 +23,7 @@ import {
   acceptTrainerSession,
   canRefuseValidatedSession,
   canValidateFromList,
+  isPublicOfferTaken,
   REFUSE_MIN_DAYS_BEFORE,
   refuseTrainerSession,
 } from '@/features/dashboards/trainer/lib/session-decisions'
@@ -31,6 +32,7 @@ import type {
   TrainerSession,
   TrainerSessionStatus,
 } from '@/features/dashboards/trainer/types'
+import { cn } from '@/lib/cn'
 
 type StatusFilter = 'ALL' | TrainerSessionStatus
 
@@ -96,12 +98,25 @@ export function TrainerSessionsPage() {
 
   const confirmValidate = () => {
     if (!pendingValidate) return
-    acceptTrainerSession(pendingValidate.id)
+    const target = pendingValidate
+    const result = acceptTrainerSession(target.id)
     setPendingValidate(null)
     setVersion((v) => v + 1)
+    if (!result.ok) {
+      pushToast({
+        title: 'Plus disponible',
+        description:
+          result.reason ??
+          'Un autre formateur a déjà validé cette proposition publique.',
+        tone: 'warning',
+      })
+      return
+    }
     pushToast({
       title: 'Séance validée',
-      description: 'Elle apparaît maintenant avec le badge Validée.',
+      description: target.isPublicOffer
+        ? 'Vous avez obtenu la proposition publique. Les autres formateurs ne peuvent plus valider.'
+        : 'Elle apparaît maintenant avec le badge Validée.',
       tone: 'success',
     })
   }
@@ -244,7 +259,17 @@ function SessionListCard({
     <article className="rounded-xl border border-base-300 bg-white p-4 transition hover:border-primary/40">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-display text-lg font-semibold">
+          {session.isPublicOffer ? (
+            <p className="text-xs font-medium tracking-wide text-primary uppercase">
+              Offre publique
+            </p>
+          ) : null}
+          <p
+            className={cn(
+              'font-display text-lg font-semibold',
+              session.isPublicOffer ? 'mt-0.5' : '',
+            )}
+          >
             {session.subject}
           </p>
           <p className="mt-0.5 text-sm text-base-content/90">
@@ -253,6 +278,22 @@ function SessionListCard({
         </div>
         <TrainerSessionStatusBadge status={session.status} />
       </div>
+
+      {isPublicOfferTaken(session) ? (
+        <p
+          role="status"
+          className="mt-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs font-medium text-base-content"
+        >
+          {session.statusNote}
+        </p>
+      ) : null}
+
+      {session.proposalNote && session.status === 'PENDING' ? (
+        <p className="mt-3 rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-xs text-base-content/90">
+          <span className="font-medium">Note admin : </span>
+          {session.proposalNote}
+        </p>
+      ) : null}
 
       <dl className="mt-3 flex flex-col gap-1.5 text-sm text-base-content/90">
         <div className="flex items-center gap-2">

@@ -18,31 +18,41 @@ export const WEEKDAY_LABELS: Record<TrainerWeekday, string> = {
 /** Jours proposés pour les TD (hors jours de cours classiques). */
 export const AVAILABILITY_WEEKDAYS: TrainerWeekday[] = [3, 6, 7]
 
-/** Créneaux récurrents démo — mercredi après-cours + week-end. */
+/**
+ * Créneaux récurrents démo — durées libres (comme définies par le formateur).
+ * Fenêtre autorisée : mer 16–19, sam/dim 08–19.
+ */
 export const TRAINER_RECURRING_SLOTS: TrainerRecurringSlot[] = [
   {
     id: 'slot-wed',
     weekday: 3,
     startTime: '16:00',
-    endTime: '19:00',
+    endTime: '18:00',
     establishmentName: ESTABLISHMENT,
     active: true,
   },
   {
-    id: 'slot-sat',
+    id: 'slot-sat-am',
     weekday: 6,
     startTime: '08:00',
-    endTime: '19:00',
+    endTime: '10:30',
+    establishmentName: ESTABLISHMENT,
+    active: true,
+  },
+  {
+    id: 'slot-sat-mid',
+    weekday: 6,
+    startTime: '11:00',
+    endTime: '13:00',
     establishmentName: ESTABLISHMENT,
     active: true,
   },
   {
     id: 'slot-sun',
     weekday: 7,
-    startTime: '08:00',
-    endTime: '19:00',
+    startTime: '10:30',
+    endTime: '12:30',
     establishmentName: ESTABLISHMENT,
     active: true,
   },
 ]
-

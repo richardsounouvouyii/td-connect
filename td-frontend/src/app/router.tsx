@@ -9,7 +9,14 @@ import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
 import { ForbiddenPage } from '@/features/auth/pages/ForbiddenPage'
 import { LoginPage } from '@/features/auth/pages/LoginPage'
 import { HomePage } from '@/features/dashboards/public/HomePage'
+import { SchoolAdminClassDetailPage } from '@/features/dashboards/school-admin/pages/SchoolAdminClassDetailPage'
+import { SchoolAdminClassesPage } from '@/features/dashboards/school-admin/pages/SchoolAdminClassesPage'
+import { SchoolAdminDocumentsPage } from '@/features/dashboards/school-admin/pages/SchoolAdminDocumentsPage'
 import { SchoolAdminHomePage } from '@/features/dashboards/school-admin/pages/SchoolAdminHomePage'
+import { SchoolAdminSettingsPage } from '@/features/dashboards/school-admin/pages/SchoolAdminSettingsPage'
+import { SchoolAdminPlanningPage } from '@/features/dashboards/school-admin/pages/SchoolAdminPlanningPage'
+import { SchoolAdminProposeSessionPage } from '@/features/dashboards/school-admin/pages/SchoolAdminProposeSessionPage'
+import { SchoolAdminSessionDetailPage } from '@/features/dashboards/school-admin/pages/SchoolAdminSessionDetailPage'
 import { SectionPlaceholderPage } from '@/features/dashboards/shared/SectionPlaceholderPage'
 import { StudentExamsPage } from '@/features/dashboards/student/pages/StudentExamsPage'
 import { StudentHomePage } from '@/features/dashboards/student/pages/StudentHomePage'
@@ -87,10 +94,22 @@ export function AppRouter() {
         >
           <Route element={<SchoolAdminLayout />}>
             <Route index element={<SchoolAdminHomePage />} />
-            <Route path="classes" element={<SectionPlaceholderPage />} />
-            <Route path="planning" element={<SectionPlaceholderPage />} />
-            <Route path="documents" element={<SectionPlaceholderPage />} />
-            <Route path="parametres" element={<SectionPlaceholderPage />} />
+            <Route path="classes" element={<SchoolAdminClassesPage />} />
+            <Route
+              path="classes/:classId"
+              element={<SchoolAdminClassDetailPage />}
+            />
+            <Route path="planning" element={<SchoolAdminPlanningPage />} />
+            <Route
+              path="planning/nouvelle"
+              element={<SchoolAdminProposeSessionPage />}
+            />
+            <Route
+              path="planning/:sessionId"
+              element={<SchoolAdminSessionDetailPage />}
+            />
+            <Route path="documents" element={<SchoolAdminDocumentsPage />} />
+            <Route path="parametres" element={<SchoolAdminSettingsPage />} />
           </Route>
         </Route>
 

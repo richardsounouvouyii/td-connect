@@ -33,6 +33,9 @@ export type TrainerSession = {
   proposalNote?: string
   hasExam?: boolean
   hasCorrection?: boolean
+  /** Proposition publique partagée entre formateurs. */
+  offerGroupId?: string
+  isPublicOffer?: boolean
 }
 
 export type TrainerAlert = {
@@ -49,6 +52,7 @@ export type TrainerNotificationKind =
   | 'SESSION_POSTPONED'
   | 'SESSION_CANCELLED'
   | 'EXAM_MISSING'
+  | 'ADMIN_PACK_READY'
   | 'NO_ENROLLMENT'
   | 'REMINDER'
 
@@ -100,7 +104,24 @@ export type TrainerAvailabilityException = {
 
 export type TrainerDocumentKind = 'EXAM' | 'CORRECTION'
 
-/** Épreuve ou corrigé publié par le formateur pour une séance. */
+/** Fichier joint par l’admin pour la préparation du formateur. */
+export type TrainerAdminPackFile = {
+  fileName: string
+  fileSizeLabel: string
+  pages: number
+  providedAt: string
+}
+
+/**
+ * Pack interne admin → formateur (pas visible élèves).
+ * Le formateur télécharge pour préparer ; la publication élèves est séparée.
+ */
+export type TrainerAdminPack = {
+  exam?: TrainerAdminPackFile
+  correction?: TrainerAdminPackFile
+}
+
+/** Épreuve ou corrigé publié par le formateur pour les élèves. */
 export type TrainerDocument = {
   id: string
   kind: TrainerDocumentKind
