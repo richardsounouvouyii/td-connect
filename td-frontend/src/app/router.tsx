@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { ScrollToTop } from '@/components/navigation/shared/ScrollToTop'
 import { PublicLayout } from '@/app/layouts/PublicLayout'
 import { SchoolAdminLayout } from '@/app/layouts/SchoolAdminLayout'
 import { StudentLayout } from '@/app/layouts/StudentLayout'
@@ -22,6 +23,7 @@ import { TrainerHomePage } from '@/features/dashboards/trainer/pages/TrainerHome
 export function AppRouter() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route index element={<HomePage />} />
