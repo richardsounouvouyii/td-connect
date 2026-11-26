@@ -44,17 +44,22 @@ export function StudentSessionDetailPage() {
   const linkedDocs = STUDENT_DOCUMENTS.filter(
     (doc) => doc.linkedSessionId === session.id,
   )
+  const hasExam = linkedDocs.some((doc) => doc.kind === 'EXAM')
+  const hasCorrection = linkedDocs.some((doc) => doc.kind === 'CORRECTION')
+  const showPendingCorrection = hasExam && !hasCorrection
   const priceLabel = formatSessionPrice(session)
   const joinable = canJoinSession(session)
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      <Link to="/eleve/planning" className="inline-flex w-fit">
-        <Button variant="ghost" className="min-h-11 gap-2 px-2">
-          <ArrowLeft className="size-4" aria-hidden />
-          Retour au planning
-        </Button>
-      </Link>
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+      <div className="sticky top-[3.75rem] z-20 -mx-4 -mt-5 border-b border-base-300/70 bg-base-100/95 px-4 py-1.5 backdrop-blur-md sm:-mx-6 sm:px-6">
+        <Link to="/eleve/planning" className="inline-flex w-fit">
+          <Button variant="ghost" className="min-h-10 gap-2 px-2">
+            <ArrowLeft className="size-4" aria-hidden />
+            Retour au planning
+          </Button>
+        </Link>
+      </div>
 
       <header className="rounded-xl border border-base-300 bg-white p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -150,7 +155,7 @@ export function StudentSessionDetailPage() {
           </Link>
         </div>
 
-        {linkedDocs.length === 0 ? (
+        {linkedDocs.length === 0 && !showPendingCorrection ? (
           <p className="mt-3 rounded-xl border border-base-300 bg-white px-4 py-6 text-center text-base-content/90">
             Aucun document publié pour cette séance pour le moment.
           </p>
@@ -171,6 +176,33 @@ export function StudentSessionDetailPage() {
                 />
               </li>
             ))}
+            {showPendingCorrection ? (
+              <li>
+                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-base-300 bg-base-200/40 px-4 py-3">
+                  <span className="flex size-10 items-center justify-center rounded-lg bg-base-300/60 text-base-content/50">
+                    <FileCheck2 className="size-4" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-base-content/80">
+                      Corrigé — {session.chapter}
+                    </p>
+                    <p className="text-sm text-base-content/70">
+                      Pas encore publié — disponible après la séance.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="min-h-11 gap-2 border-2 border-base-300 bg-base-200 text-base-content/50"
+                    disabled
+                    title="Corrigé pas encore publié"
+                  >
+                    <Download className="size-4" aria-hidden />
+                    PDF
+                  </Button>
+                </div>
+              </li>
+            ) : null}
           </ul>
         )}
       </section>

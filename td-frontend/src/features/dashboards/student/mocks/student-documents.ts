@@ -1,6 +1,10 @@
 import type { StudentDocument } from '@/features/dashboards/student/types'
 
-/** Catalogue démo épreuves / corrigés publiés par les formateurs. */
+/**
+ * Catalogue démo épreuves / corrigés.
+ * Règle métier : l’épreuve peut paraître avant la séance ;
+ * le corrigé n’apparaît que lorsqu’il est publié (après la séance).
+ */
 export const STUDENT_DOCUMENTS: StudentDocument[] = [
   {
     id: 'doc-1',
@@ -26,7 +30,7 @@ export const STUDENT_DOCUMENTS: StudentDocument[] = [
     trainerName: 'Jean Formateur',
     publishedAt: '2026-11-26',
     linkedSessionId: 'sess-1',
-    fileName: 'epreuve-logarithmes.pdf',
+    fileName: 'corrige-logarithmes.pdf',
     fileSizeLabel: '280 Ko',
     pages: 3,
     downloadable: true,
@@ -34,6 +38,21 @@ export const STUDENT_DOCUMENTS: StudentDocument[] = [
   },
   {
     id: 'doc-2',
+    title: 'Épreuve — Probabilités',
+    kind: 'EXAM',
+    subject: 'Mathématiques',
+    chapter: 'Probabilités',
+    trainerName: 'Jean Formateur',
+    publishedAt: '2026-11-18',
+    linkedSessionId: 'sess-0',
+    fileName: 'epreuve-probabilites.pdf',
+    fileSizeLabel: '210 Ko',
+    pages: 3,
+    downloadable: true,
+    seen: true,
+  },
+  {
+    id: 'doc-2b',
     title: 'Corrigé — Probabilités',
     kind: 'CORRECTION',
     subject: 'Mathématiques',
@@ -41,7 +60,7 @@ export const STUDENT_DOCUMENTS: StudentDocument[] = [
     trainerName: 'Jean Formateur',
     publishedAt: '2026-11-22',
     linkedSessionId: 'sess-0',
-    fileName: 'epreuve-probabilites.pdf',
+    fileName: 'corrige-probabilites.pdf',
     fileSizeLabel: '198 Ko',
     pages: 2,
     downloadable: true,
@@ -71,7 +90,7 @@ export const STUDENT_DOCUMENTS: StudentDocument[] = [
     trainerName: 'Amina Koffi',
     publishedAt: '2026-11-25',
     linkedSessionId: 'sess-9',
-    fileName: 'epreuve-mecanique-forces.pdf',
+    fileName: 'corrige-mecanique-forces.pdf',
     fileSizeLabel: '264 Ko',
     pages: 4,
     downloadable: true,
@@ -79,6 +98,21 @@ export const STUDENT_DOCUMENTS: StudentDocument[] = [
   },
   {
     id: 'doc-4',
+    title: 'Épreuve — Génétique',
+    kind: 'EXAM',
+    subject: 'SVT',
+    chapter: 'Génétique mendélienne',
+    trainerName: 'Paul Mensah',
+    publishedAt: '2026-11-20',
+    linkedSessionId: 'sess-7',
+    fileName: 'epreuve-genetique.pdf',
+    fileSizeLabel: '245 Ko',
+    pages: 4,
+    downloadable: true,
+    seen: true,
+  },
+  {
+    id: 'doc-4b',
     title: 'Corrigé — Génétique',
     kind: 'CORRECTION',
     subject: 'SVT',
@@ -86,7 +120,7 @@ export const STUDENT_DOCUMENTS: StudentDocument[] = [
     trainerName: 'Paul Mensah',
     publishedAt: '2026-11-24',
     linkedSessionId: 'sess-7',
-    fileName: 'epreuve-genetique.pdf',
+    fileName: 'corrige-genetique.pdf',
     fileSizeLabel: '220 Ko',
     pages: 3,
     downloadable: true,
@@ -109,31 +143,31 @@ export const STUDENT_DOCUMENTS: StudentDocument[] = [
   },
   {
     id: 'doc-6',
-    title: 'Corrigé — Électricité',
-    kind: 'CORRECTION',
+    title: 'Épreuve — Électricité',
+    kind: 'EXAM',
     subject: 'Physique-Chimie',
     chapter: 'Électricité',
     trainerName: 'Amina Koffi',
-    publishedAt: '2026-11-20',
+    publishedAt: '2026-11-26',
     linkedSessionId: 'sess-2',
     fileName: 'epreuve-electricite.pdf',
-    fileSizeLabel: '175 Ko',
-    pages: 2,
+    fileSizeLabel: '190 Ko',
+    pages: 3,
     downloadable: true,
-    seen: true,
+    seen: false,
   },
   {
-    id: 'doc-9',
-    title: 'Corrigé — Dérivation',
-    kind: 'CORRECTION',
+    id: 'doc-8',
+    title: 'Épreuve — Dérivation',
+    kind: 'EXAM',
     subject: 'Mathématiques',
     chapter: 'Dérivation et applications',
     trainerName: 'Jean Formateur',
-    publishedAt: '2026-11-24',
+    publishedAt: '2026-11-20',
     linkedSessionId: 'sess-8',
     fileName: 'epreuve-derivation.pdf',
-    fileSizeLabel: '240 Ko',
-    pages: 3,
+    fileSizeLabel: '255 Ko',
+    pages: 4,
     downloadable: true,
     seen: false,
   },
@@ -153,6 +187,19 @@ export const STUDENT_DOCUMENTS: StudentDocument[] = [
     seen: true,
   },
 ]
+
+export type StudentDocumentPack = {
+  id: string
+  subject: string
+  chapter: string
+  trainerName: string
+  linkedSessionId?: string
+  exam?: StudentDocument
+  correction?: StudentDocument
+  /** Date de référence pour le tri (dernier fichier publié). */
+  publishedAt: string
+  seen: boolean
+}
 
 export function getStudentDocumentById(
   id: string,
@@ -174,3 +221,44 @@ export function getLinkedDocument(
   )
 }
 
+/** Une carte catalogue = une séance (épreuve ± corrigé). */
+export function listStudentDocumentPacks(
+  documents: StudentDocument[] = STUDENT_DOCUMENTS,
+): StudentDocumentPack[] {
+  const packs = new Map<string, StudentDocumentPack>()
+
+  for (const doc of documents) {
+    const key = doc.linkedSessionId ?? doc.id
+    const existing = packs.get(key)
+
+    if (!existing) {
+      packs.set(key, {
+        id: key,
+        subject: doc.subject,
+        chapter: doc.chapter,
+        trainerName: doc.trainerName,
+        linkedSessionId: doc.linkedSessionId,
+        exam: doc.kind === 'EXAM' ? doc : undefined,
+        correction: doc.kind === 'CORRECTION' ? doc : undefined,
+        publishedAt: doc.publishedAt,
+        seen: true,
+      })
+      continue
+    }
+
+    if (doc.kind === 'EXAM') existing.exam = doc
+    if (doc.kind === 'CORRECTION') existing.correction = doc
+    if (doc.publishedAt > existing.publishedAt) {
+      existing.publishedAt = doc.publishedAt
+    }
+  }
+
+  return [...packs.values()].map((pack) => {
+    const parts = [pack.exam, pack.correction].filter(Boolean) as StudentDocument[]
+    return {
+      ...pack,
+      /** Nouveau si au moins un fichier publié n’a pas encore été vu. */
+      seen: parts.length > 0 && parts.every((part) => Boolean(part.seen)),
+    }
+  })
+}

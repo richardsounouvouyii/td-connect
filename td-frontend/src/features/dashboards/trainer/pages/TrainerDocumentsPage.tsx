@@ -575,7 +575,7 @@ function DocumentSlot({
               type="button"
               size="sm"
               variant="outline"
-              className="min-h-10 gap-1.5"
+              className="min-h-10 gap-1.5 border-2 border-base-content/35 text-base-content shadow-none"
               onClick={() => onDownload(document)}
             >
               <Download className="size-3.5" aria-hidden />
@@ -585,7 +585,7 @@ function DocumentSlot({
               type="button"
               size="sm"
               variant="outline"
-              className="min-h-10 gap-1.5"
+              className="min-h-10 gap-1.5 border-2 border-base-content/35 text-base-content shadow-none"
               onClick={() => onReplace(document)}
             >
               <RefreshCw className="size-3.5" aria-hidden />

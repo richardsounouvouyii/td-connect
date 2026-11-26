@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useToast } from '@/components/feedback/ToastProvider'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FilterChip } from '@/features/dashboards/student/components/FilterChip'
 import {
   listStudentAlerts,
@@ -87,6 +88,7 @@ export function StudentNotificationsPage() {
   const [items, setItems] = useState(listStudentAlerts)
   const [readFilter, setReadFilter] = useState<ReadFilter>('ALL')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('ALL')
+  const [markAllOpen, setMarkAllOpen] = useState(false)
 
   const unreadCount = useMemo(
     () => items.filter((item) => !item.read).length,
@@ -114,11 +116,15 @@ export function StudentNotificationsPage() {
     setItems(listStudentAlerts())
   }
 
-  const markAllRead = () => {
-    if (unreadCount === 0) return
+  const confirmMarkAllRead = () => {
+    if (unreadCount === 0) {
+      setMarkAllOpen(false)
+      return
+    }
     const previousUnread = unreadCount
     markAllAlertsRead()
     setItems(listStudentAlerts())
+    setMarkAllOpen(false)
     pushToast({
       title: 'Tout marqué comme lu',
       description: `${previousUnread} alerte${previousUnread > 1 ? 's' : ''} mise${previousUnread > 1 ? 's' : ''} à jour.`,
@@ -144,9 +150,9 @@ export function StudentNotificationsPage() {
           type="button"
           variant="outline"
           size="sm"
-          className="gap-2"
+          className="gap-2 border-2 border-base-content/35 text-base-content shadow-none"
           disabled={unreadCount === 0}
-          onClick={markAllRead}
+          onClick={() => setMarkAllOpen(true)}
         >
           <CheckCheck className="size-4" aria-hidden />
           Tout marquer lu
@@ -278,6 +284,20 @@ export function StudentNotificationsPage() {
           </ul>
         )}
       </section>
+
+      <ConfirmDialog
+        open={markAllOpen}
+        title="Tout marquer comme lu ?"
+        message={
+          unreadCount > 0
+            ? `Toutes vos alertes non lues (${unreadCount}) seront marquées comme lues.`
+            : 'Aucune alerte non lue.'
+        }
+        confirmLabel="Tout marquer lu"
+        cancelLabel="Annuler"
+        onConfirm={confirmMarkAllRead}
+        onCancel={() => setMarkAllOpen(false)}
+      />
     </div>
   )
 }

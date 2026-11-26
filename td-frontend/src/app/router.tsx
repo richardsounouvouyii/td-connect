@@ -21,6 +21,8 @@ import { SuperAdminHomePage } from '@/features/dashboards/super-admin/pages/Supe
 import { TrainerAvailabilityPage } from '@/features/dashboards/trainer/pages/TrainerAvailabilityPage'
 import { TrainerDocumentsPage } from '@/features/dashboards/trainer/pages/TrainerDocumentsPage'
 import { TrainerHomePage } from '@/features/dashboards/trainer/pages/TrainerHomePage'
+import { TrainerNotificationsPage } from '@/features/dashboards/trainer/pages/TrainerNotificationsPage'
+import { TrainerProfilePage } from '@/features/dashboards/trainer/pages/TrainerProfilePage'
 import { TrainerSessionDetailPage } from '@/features/dashboards/trainer/pages/TrainerSessionDetailPage'
 import { TrainerSessionsPage } from '@/features/dashboards/trainer/pages/TrainerSessionsPage'
 
@@ -71,8 +73,11 @@ export function AppRouter() {
               element={<TrainerSessionDetailPage />}
             />
             <Route path="documents" element={<TrainerDocumentsPage />} />
-            <Route path="notifications" element={<SectionPlaceholderPage />} />
-            <Route path="profil" element={<SectionPlaceholderPage />} />
+            <Route
+              path="notifications"
+              element={<TrainerNotificationsPage />}
+            />
+            <Route path="profil" element={<TrainerProfilePage />} />
           </Route>
         </Route>
 

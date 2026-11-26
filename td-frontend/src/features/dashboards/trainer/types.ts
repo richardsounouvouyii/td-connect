@@ -42,6 +42,41 @@ export type TrainerAlert = {
   tone: 'info' | 'warning' | 'success'
 }
 
+export type TrainerNotificationKind =
+  | 'PROPOSAL_PENDING'
+  | 'SESSION_VALIDATED'
+  | 'SESSION_REFUSED'
+  | 'SESSION_POSTPONED'
+  | 'SESSION_CANCELLED'
+  | 'EXAM_MISSING'
+  | 'NO_ENROLLMENT'
+  | 'REMINDER'
+
+export type TrainerNotification = {
+  id: string
+  title: string
+  message: string
+  kind: TrainerNotificationKind
+  createdAt: string
+  read: boolean
+  linkedSessionId?: string
+  linkedToDocuments?: boolean
+}
+
+/** Classes prises en charge pour l’instant : 3ème et Terminale. */
+export type TrainerClassLabel = '3ème' | 'Terminale'
+
+/** Infos métier formateur (hors AuthUser) — gérées avec l’admin. */
+export type TrainerProfile = {
+  subjects: string[]
+  /** Classes d’intervention (3ème, Terminale). */
+  classes: TrainerClassLabel[]
+  groups: string[]
+  establishments: string[]
+  schoolYear: string
+  phone: string
+}
+
 /** 1 = lundi … 7 = dimanche. */
 export type TrainerWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7
 

@@ -4,7 +4,6 @@ import {
   Download,
   Eye,
   EyeOff,
-  FileCheck2,
   FileText,
   UserRound,
 } from 'lucide-react'
@@ -16,8 +15,8 @@ import { FilterChip } from '@/features/dashboards/student/components/FilterChip'
 import { downloadDemoPdf } from '@/features/dashboards/student/lib/download-demo-pdf'
 import { formatShortDate } from '@/features/dashboards/student/lib/format'
 import {
-  getLinkedDocument,
-  STUDENT_DOCUMENTS,
+  listStudentDocumentPacks,
+  type StudentDocumentPack,
 } from '@/features/dashboards/student/mocks/student-documents'
 import type { StudentDocument } from '@/features/dashboards/student/types'
 import { cn } from '@/lib/cn'
@@ -31,23 +30,28 @@ export function StudentExamsPage() {
   const [subjectFilter, setSubjectFilter] = useState<string | null>(null)
   const [seenFilter, setSeenFilter] = useState<SeenFilter>('ALL')
 
+  const packs = useMemo(() => listStudentDocumentPacks(), [])
+
   const subjects = useMemo(
     () =>
-      [...new Set(STUDENT_DOCUMENTS.map((doc) => doc.subject))].sort((a, b) =>
+      [...new Set(packs.map((pack) => pack.subject))].sort((a, b) =>
         a.localeCompare(b, 'fr'),
       ),
-    [],
+    [packs],
   )
 
-  const documents = useMemo(() => {
-    return STUDENT_DOCUMENTS.filter((doc) => {
-      if (kindFilter !== 'ALL' && doc.kind !== kindFilter) return false
-      if (subjectFilter && doc.subject !== subjectFilter) return false
-      if (seenFilter === 'NEW' && doc.seen) return false
-      if (seenFilter === 'SEEN' && !doc.seen) return false
-      return true
-    }).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
-  }, [kindFilter, subjectFilter, seenFilter])
+  const filteredPacks = useMemo(() => {
+    return packs
+      .filter((pack) => {
+        if (kindFilter === 'EXAM' && !pack.exam) return false
+        if (kindFilter === 'CORRECTION' && !pack.correction) return false
+        if (subjectFilter && pack.subject !== subjectFilter) return false
+        if (seenFilter === 'NEW' && pack.seen) return false
+        if (seenFilter === 'SEEN' && !pack.seen) return false
+        return true
+      })
+      .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+  }, [packs, kindFilter, subjectFilter, seenFilter])
 
   const hasActiveFilters =
     kindFilter !== 'ALL' || subjectFilter !== null || seenFilter !== 'ALL'
@@ -59,8 +63,8 @@ export function StudentExamsPage() {
           Épreuves
         </h1>
         <p className="mt-1 font-sans text-base text-base-content/90">
-          Épreuves et corrigés publiés par vos formateurs — téléchargeables en
-          PDF.
+          L’épreuve est téléchargeable dès publication. Le corrigé s’active
+          seulement quand le formateur l’a publié après la séance.
         </p>
       </header>
 
@@ -176,18 +180,18 @@ export function StudentExamsPage() {
 
       <section aria-labelledby="liste-documents">
         <h2 id="liste-documents" className="font-display text-xl font-semibold">
-          Documents ({documents.length})
+          Documents ({filteredPacks.length})
         </h2>
 
-        {documents.length === 0 ? (
+        {filteredPacks.length === 0 ? (
           <p className="mt-4 rounded-xl border border-base-300 bg-white px-4 py-8 text-center font-sans text-base-content/90">
             Aucun document avec ces filtres.
           </p>
         ) : (
           <ul className="mt-4 flex flex-col gap-3">
-            {documents.map((doc) => (
-              <li key={doc.id}>
-                <DocumentCard document={doc} />
+            {filteredPacks.map((pack) => (
+              <li key={pack.id}>
+                <DocumentPackCard pack={pack} />
               </li>
             ))}
           </ul>
@@ -197,12 +201,12 @@ export function StudentExamsPage() {
   )
 }
 
-function DocumentCard({ document }: { document: StudentDocument }) {
+function DocumentPackCard({ pack }: { pack: StudentDocumentPack }) {
   const { pushToast } = useToast()
-  const isExam = document.kind === 'EXAM'
-  const isNew = !document.seen
-  const examDoc = getLinkedDocument(document, 'EXAM')
-  const correctionDoc = getLinkedDocument(document, 'CORRECTION')
+  const examReady = Boolean(pack.exam?.downloadable)
+  const correctionReady = Boolean(pack.correction?.downloadable)
+  const isNew = !pack.seen
+  const referenceDoc = pack.exam ?? pack.correction
 
   const handleDownload = (
     target: StudentDocument | undefined,
@@ -211,7 +215,10 @@ function DocumentCard({ document }: { document: StudentDocument }) {
     if (!target?.downloadable) {
       pushToast({
         title: `${label} indisponible`,
-        description: 'Le formateur n’a pas encore publié ce fichier.',
+        description:
+          label === 'Corrigé PDF'
+            ? 'Le corrigé sera disponible après la séance, quand le formateur l’aura publié.'
+            : 'Le formateur n’a pas encore publié ce fichier.',
         tone: 'warning',
       })
       return
@@ -225,33 +232,26 @@ function DocumentCard({ document }: { document: StudentDocument }) {
     })
   }
 
+  const statusLabel = (() => {
+    if (examReady && correctionReady) return 'Épreuve + corrigé'
+    if (examReady) return 'Épreuve seule · corrigé bientôt'
+    if (correctionReady) return 'Corrigé publié'
+    return 'Aucun fichier'
+  })()
+
   return (
     <article className="rounded-xl border border-base-300 bg-white p-4 font-sans">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-3">
-          <span
-            className={cn(
-              'flex size-10 shrink-0 items-center justify-center rounded-lg',
-              isExam
-                ? 'bg-primary/10 text-primary'
-                : 'bg-success/15 text-success',
-            )}
-          >
-            {isExam ? (
-              <BookOpen className="size-4" aria-hidden />
-            ) : (
-              <FileCheck2 className="size-4" aria-hidden />
-            )}
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <BookOpen className="size-4" aria-hidden />
           </span>
           <div className="min-w-0">
             <p className="font-display text-lg font-semibold text-base-content">
-              {document.title}
+              {pack.chapter}
             </p>
             <p className="mt-0.5 text-sm text-base-content/90">
-              {isExam ? 'Épreuve' : 'Corrigé'} · {document.subject}
-            </p>
-            <p className="mt-0.5 text-sm text-base-content/80">
-              {document.chapter}
+              {pack.subject} · {statusLabel}
             </p>
           </div>
         </div>
@@ -279,52 +279,86 @@ function DocumentCard({ document }: { document: StudentDocument }) {
       <dl className="mt-3 flex flex-col gap-1.5 text-sm text-base-content/90">
         <div className="flex items-center gap-2">
           <UserRound className="size-4 shrink-0 text-primary" aria-hidden />
-          <span>{document.trainerName}</span>
+          <span>{pack.trainerName}</span>
         </div>
         <div className="flex items-center gap-2">
           <CalendarDays className="size-4 shrink-0 text-primary" aria-hidden />
-          <span>Publié le {formatShortDate(document.publishedAt)}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <FileText className="size-4 shrink-0 text-primary" aria-hidden />
           <span>
-            {document.fileName} · {document.pages} page
-            {document.pages > 1 ? 's' : ''} · {document.fileSizeLabel}
+            {examReady && pack.exam
+              ? `Épreuve le ${formatShortDate(pack.exam.publishedAt)}`
+              : 'Épreuve non publiée'}
+            {correctionReady && pack.correction
+              ? ` · Corrigé le ${formatShortDate(pack.correction.publishedAt)}`
+              : ' · Corrigé pas encore publié'}
           </span>
         </div>
+        {referenceDoc ? (
+          <div className="flex items-center gap-2">
+            <FileText className="size-4 shrink-0 text-primary" aria-hidden />
+            <span>
+              {examReady && pack.exam
+                ? `${pack.exam.fileName} · ${pack.exam.pages} p. · ${pack.exam.fileSizeLabel}`
+                : correctionReady && pack.correction
+                  ? `${pack.correction.fileName} · ${pack.correction.pages} p. · ${pack.correction.fileSizeLabel}`
+                  : null}
+            </span>
+          </div>
+        ) : null}
       </dl>
 
-      {document.linkedSessionId ? (
+      {pack.linkedSessionId ? (
         <Link
-          to={`/eleve/planning/${document.linkedSessionId}`}
+          to={`/eleve/planning/${pack.linkedSessionId}`}
           className="link link-primary mt-2 inline-flex min-h-9 items-center text-sm no-underline"
         >
           Voir la séance liée
         </Link>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-base-200 pt-3">
-        <Button
-          type="button"
-          size="sm"
-          className="min-h-11 gap-2"
-          disabled={!examDoc?.downloadable}
-          onClick={() => handleDownload(examDoc, 'Épreuve PDF')}
-        >
-          <Download className="size-4" aria-hidden />
-          Épreuve PDF
-        </Button>
+      <div className="mt-4 flex flex-col gap-2 border-t border-base-200 pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Button
+            type="button"
+            size="sm"
+            className="min-h-11 gap-2"
+            disabled={!examReady}
+            title={
+              examReady
+                ? 'Télécharger l’épreuve'
+                : 'Épreuve pas encore publiée'
+            }
+            onClick={() => handleDownload(pack.exam, 'Épreuve PDF')}
+          >
+            <Download className="size-4" aria-hidden />
+            Épreuve PDF
+          </Button>
 
-        <Button
-          type="button"
-          size="sm"
-          className="min-h-11 gap-2 border-success bg-success text-success-content hover:border-success hover:bg-success/90"
-          disabled={!correctionDoc?.downloadable}
-          onClick={() => handleDownload(correctionDoc, 'Corrigé PDF')}
-        >
-          <Download className="size-4" aria-hidden />
-          Corrigé PDF
-        </Button>
+          <Button
+            type="button"
+            size="sm"
+            className={cn(
+              'min-h-11 gap-2',
+              correctionReady
+                ? 'border-success bg-success text-success-content hover:border-success hover:bg-success/90'
+                : 'border-2 border-base-300 bg-base-200 text-base-content/50',
+            )}
+            disabled={!correctionReady}
+            title={
+              correctionReady
+                ? 'Télécharger le corrigé'
+                : 'Corrigé pas encore publié'
+            }
+            onClick={() => handleDownload(pack.correction, 'Corrigé PDF')}
+          >
+            <Download className="size-4" aria-hidden />
+            Corrigé PDF
+          </Button>
+        </div>
+        {!correctionReady ? (
+          <p className="text-xs text-base-content/70">
+            Corrigé indisponible pour l’instant — publié après la séance.
+          </p>
+        ) : null}
       </div>
     </article>
   )
